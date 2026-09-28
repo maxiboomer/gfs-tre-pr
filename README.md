@@ -36,8 +36,7 @@ pip install pygrib numpy
 
 ## Artefato
 
-O artefato HTML é publicado no VPS em `https://noaa.netspin.com.br/` (Aguardando DNS `noaa.netspin.com.br → 163.245.212.102`).
-
+O artefato HTML é publicado no VPS em `https://noaa.netspin.com.br/`
 Contém:
 - Mapa interativo do Paraná com previsão por região
 - Timeline de chuva/rajada
