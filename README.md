@@ -21,12 +21,16 @@ Monitoramento do modelo GFS 0,25° para previsão de risco climático no Paraná
 ## Uso
 
 ```bash
-# Rodar manualmente (ciclo AAAAMMDDHH)
-python3 atualizar_gfs.py 2026092912 artefato_final.html artefato_final.html
+# Deixar o monitor descobrir a rodada sozinho (é o que o cron faz)
+/root/.hermes/venv-gfs/bin/python3 gfs_monitor.py
 
-# Monitor (cron a cada 30min)
-# Configurado em: hermes cron list → "GFS 12Z monitor"
+# Ou forçar uma rodada específica (ciclo AAAAMMDDHH)
+python3 atualizar_gfs.py 2026093012 artefato_final.html artefato_final.html
 ```
+
+O monitor descobre sozinho a rodada **12Z** mais recente que ainda não está no
+artefato, valida se o NOMADS já a publicou e só então roda o atualizador. Não há
+ciclo fixo no código. Rodar duas vezes não duplica rodada.
 
 ## Requisitos
 
@@ -36,19 +40,54 @@ pip install pygrib numpy
 
 ## Artefato
 
-O artefato HTML é publicado no VPS em `https://noaa.netspin.com.br/`
+**O HTML não é versionado no git** (`.gitignore` exclui `artefato*.html`): são
+2,7 MB por versão e muda a cada rodada, o que inflaria o histórico. Ele é
+publicado em dois lugares:
+
+- **VPS**: `https://noaa.netspin.com.br/artefato.html`
+- **Release**: [`v1.0`](https://github.com/maxiboomer/gfs-tre-pr/releases/tag/v1.0)
+  (`artefato_final.html` anexado)
+
+A release v1.0 é uma **tag mutável**: é apagada e recriada a cada publicação.
+A URL é estável, o conteúdo não é append-only. Para recuperar o artefato
+atual: baixe o anexo da release, ou `scp` do VPS.
+
+Para rodar `atualizar_gfs.py` localmente, baixe o artefato da release e
+use-o como entrada e saída.
+
 Contém:
 - Mapa interativo do Paraná com previsão por região
 - Timeline de chuva/rajada
 - Risco por região (Oeste, Norte, Centro-Sul, Leste)
-- Cartórios de risco alto/crítico
-- Comparação entre rodadas
+- Índice de tensão para interrupção de energia (0–100), com hover mostrando o
+  motivo de cada valor
+- Ranking dos 12 cartórios de maior tensão, cruzado com a vulnerabilidade da SECAD
+- Comparação entre rodadas, com abas Atual (2 últimas) e Archive
+- Rodapé "Fórmulas e índices": equação, pesos, faixas e limitações
 
 ## Cronograma
 
 - Ciclos GFS: 00Z, 06Z, 12Z, 18Z (diários)
 - Monitor foca no **12Z** (mais relevante para janela 03/10–06/10)
 - Atualização automática quando dados publicados (~3h após ciclo)
+
+## Armadilhas conhecidas
+
+Verificadas nos incidents de 30/09. Vale conferir antes de mexer no CSS:
+
+- **Chaves CSS balanceadas.** Um `@media` sem o `}` de fechamento engole todo o
+  CSS seguinte: o browser aceita 2 de 117 regras e descarta o resto **sem erro
+  no console**. Confira com `document.styleSheets[1].cssRules.length` — tem que
+  ser > 50. Um `replace` de texto sobre HTML pode comer a chave vizinha.
+- **`node --check` não valida CSS.** Só sintaxe de JavaScript. Um artefato com
+  CSS destruído passa nele.
+- **Verificar no browser, não só no arquivo.** `base_artefato.html` é a base
+  original e **não tem** o índice de tensão, o rodapé de método nem as abas.
+  Regenerar a partir dele perde esse trabalho. Use sempre o artefato atual como
+  entrada.
+- **Contraste das cores de risco.** Os valores originais reprovavam WCAG AA
+  (o amarelo de "moderado" dava 1,96:1). Recalibrados; manter ≥ 3:1 no claro e
+  no escuro.
 
 ## Dados
 

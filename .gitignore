@@ -1,3 +1,11 @@
+# GRIB baixados do NOMADS (grande, recriavel)
 *.grb
+grib_*/
+
+# Artefato: 2,7 MB por versao, muda a cada rodada. Versionado na release v1.0,
+# nao no git, para nao inflar o historico.
 artefato*.html
-grib_*
+*.log
+__pycache__/
+*.pyc
+.venv/
