@@ -9,3 +9,6 @@ artefato*.html
 __pycache__/
 *.pyc
 .venv/
+
+# dados raw do PANORAMA ESTADUAL (nao versionados; o JSON limpo <-> versionado)
+municipios/*.xlsx
