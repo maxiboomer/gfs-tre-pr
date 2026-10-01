@@ -7,10 +7,13 @@ ciclo 12Z de hoje, retrocedendo), e roda o atualizador quando ela ainda nao
 esta no artefato. Nao ha ciclo fixo no codigo: trocar a data aqui nao e mais
 necessario, e o monitor nao trava quando uma rodada demora a aparecer.
 
+Apos ingerir, PUBLICA no VPS e na release do GitHub — o atualizador so escreve
+o arquivo local; sem a publicacao o site publico fica desatualizado.
+
 Saida: nada quando nao ha rodada nova (o cron nao notifica).
         texto quando houve ingestao (o cron entrega no WhatsApp).
 """
-import sys, os, json, re, time, subprocess, urllib.request
+import sys, os, json, re, subprocess, urllib.request
 from datetime import datetime, timedelta, timezone
 
 ART = "/root/artefato_final.html"
@@ -58,6 +61,35 @@ def candidatas():
     return out
 
 
+def publicar():
+    """Sobe o artefato para o VPS e recria a release v1.0 do GitHub.
+
+    Retorna 0 em sucesso, 1 em falha. O VPS usa scp com a chave do servidor;
+    a release usa o gh CLI (tag mutavel, apagada e recriada).
+    """
+    vps = subprocess.run(
+        ["scp", "-i", "/root/.ssh/vps_tre", "-o", "StrictHostKeyChecking=no",
+         ART, "root@163.245.212.102:/var/www/html/artefato.html"],
+        capture_output=True, text=True, timeout=120)
+    if vps.returncode != 0:
+        sys.stderr.write("scp VPS falhou: " + (vps.stderr or "")[:300] + "\n")
+        return 1
+
+    gh = subprocess.run(
+        ["bash", "-lc",
+         "cd /root/gfs-tre-pr && "
+         "gh release delete v1.0 --yes >/dev/null 2>&1; "
+         "gh release create v1.0 --title 'Rodada GFS atualizada' "
+         "--notes 'Atualizacao automatica pelo monitor GFS.' "
+         "--repo maxiboomer/gfs-tre-pr >/dev/null 2>&1 && "
+         "gh release upload v1.0 " + ART + " --repo maxiboomer/gfs-tre-pr >/dev/null 2>&1"],
+        capture_output=True, text=True, timeout=180)
+    if gh.returncode != 0:
+        sys.stderr.write("release GitHub falhou: " + (gh.stderr or "")[:300] + "\n")
+        return 1
+    return 0
+
+
 def main():
     if not os.path.exists(ART):
         sys.stderr.write("artefato ausente\n")
@@ -85,10 +117,15 @@ def main():
             sys.stderr.write((r.stdout or "") + (r.stderr or ""))
             return 1
 
-        pico = re.search(r"PICO_RAIN\s*=\s*([\d.]+)", r.stdout)
+        # publica no VPS e na release (o atualizador so escreve o arquivo local)
+        pub = publicar()
+        if pub != 0:
+            sys.stderr.write("ingestao ok, mas a publicacao falhou\n")
+            return pub
+
         resumo = re.findall(r"^(?:  )?\S.*?pico.*?$", r.stdout, re.M)
         dt = datetime.strptime(cyc, "%Y%m%d%H")
-        print(f"GFS {dt.strftime('%d/%m')} {cyc[8:]}Z ingerida no artefato.")
+        print(f"GFS {dt.strftime('%d/%m')} {cyc[8:]}Z ingerida e publicada no VPS e na release.")
         for ln in resumo[-4:]:
             print("  " + ln.strip())
         return 0
