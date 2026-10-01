@@ -67,13 +67,14 @@ def publicar():
     Retorna 0 em sucesso, 1 em falha. O VPS usa scp com a chave do servidor;
     a release usa o gh CLI (tag mutavel, apagada e recriada).
     """
-    vps = subprocess.run(
-        ["scp", "-i", "/root/.ssh/vps_tre", "-o", "StrictHostKeyChecking=no",
-         ART, "root@163.245.212.102:/var/www/html/artefato.html"],
-        capture_output=True, text=True, timeout=120)
-    if vps.returncode != 0:
-        sys.stderr.write("scp VPS falhou: " + (vps.stderr or "")[:300] + "\n")
-        return 1
+    for destino in ("artefato.html", "index.html"):
+        r = subprocess.run(
+            ["scp", "-i", "/root/.ssh/vps_tre", "-o", "StrictHostKeyChecking=no",
+             ART, "root@163.245.212.102:/var/www/html/" + destino],
+            capture_output=True, text=True, timeout=120)
+        if r.returncode != 0:
+            sys.stderr.write("scp " + destino + " falhou: " + (r.stderr or "")[:300] + "\n")
+            return 1
 
     gh = subprocess.run(
         ["bash", "-lc",
