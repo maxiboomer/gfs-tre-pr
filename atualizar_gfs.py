@@ -123,8 +123,11 @@ print("\nChecagens:", "OK" if not prob else "")
 for p in prob: print("  PROBLEMA:", p)
 if prob: sys.exit("Artefato NÃO gerado. Resolva os problemas acima.")
 
-D["runs"].append({"label": run.strftime("%d/%m · %H UTC"), "run": iso, "frames": frames, "hasWind": True})
+D["runs"].append({"label": run.strftime("%d/%m · %H UTC"), "run": iso, "model": "gfs", "frames": frames, "hasWind": True, "section": "current"})
 D["runs"].sort(key=lambda r: r["run"])
+# marca seções: ultimas 2 = current, resto = archive
+for i, r in enumerate(D["runs"]):
+    r["section"] = "current" if i >= len(D["runs"]) - 2 else "archive"
 html[k] = "const D=" + json.dumps(D, ensure_ascii=False, separators=(",", ":")) + ";"
 open(OUT, "w", encoding="utf-8").write("\n".join(html))
 

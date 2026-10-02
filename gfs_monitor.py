@@ -61,6 +61,33 @@ def candidatas():
     return out
 
 
+def candidatas_ecmwf():
+    """Ciclos ECMWF (00/06/12/18Z) dos ultimos 2 dias, do mais novo ao mais antigo.
+
+    O ECMWF open data so retem ~12 rodadas (~2-3 dias). Usa o ciclo mais recente
+    disponivel; o 06Z costuma ser o mais atual quando o 12Z ainda nao saiu.
+    """
+    agora = datetime.now(timezone.utc)
+    out = []
+    for d in range(0, 3):
+        for h in ("18", "12", "06", "00"):
+            dia = agora - timedelta(days=d)
+            if dia.hour < int(h):
+                dia -= timedelta(days=1)
+            out.append(f"{dia.strftime('%Y%m%d')}{h}")
+    return out
+
+
+def probe_ecmwf(cyc, f):
+    """True se o prazo f da rodada ECMWF existe no open data."""
+    url = (f"https://data.ecmwf.int/forecasts/{cyc[:8]}/{cyc[8:]}z/ifs/0p25/oper/"
+           f"{cyc[:8]}{cyc[8:]}0000-{f}h-oper-fc.index")
+    try:
+        return urllib.request.urlopen(url, timeout=20).status == 200
+    except Exception:
+        return False
+
+
 def publicar():
     """Sobe o artefato para o VPS e recria a release v1.0 do GitHub.
 
@@ -96,6 +123,31 @@ def main():
         sys.stderr.write("artefato ausente\n")
         return 1
 
+    # ---- ECMWF primeiro (sai ~1h antes do GFS) ----
+    for cyc in candidatas_ecmwf():
+        t = datetime.strptime(cyc, "%Y%m%d%H").replace(tzinfo=timezone.utc)
+        f0 = int((ELEI - timedelta(hours=24) - t).total_seconds() // 3600)
+        f1 = int((ELEI + timedelta(hours=48) - t).total_seconds() // 3600)
+        if f0 < 0 or f1 > 384:
+            continue
+        if existe_no_artefato(cyc):
+            break  # ja ingerida; nao precisa de rodadas mais antigas
+        if not probe_ecmwf(cyc, f0):
+            continue
+        cmd = [PY, "/root/atualizar_ecmwf.py", cyc, ART, ART]
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+        if r.returncode != 0:
+            sys.stderr.write((r.stdout or "") + (r.stderr or ""))
+            return 1
+        pub = publicar()
+        if pub != 0:
+            sys.stderr.write("ingestao ECMWF ok, mas a publicacao falhou\n")
+            return pub
+        dt = datetime.strptime(cyc, "%Y%m%d%H")
+        print(f"ECMWF {dt.strftime('%d/%m')} {cyc[8:]}Z ingerida e publicada no VPS e na release.")
+        return 0
+
+    # ---- GFS ----
     for cyc in candidatas():
         t = datetime.strptime(cyc, "%Y%m%d%H").replace(tzinfo=timezone.utc)
         # a rodada e usavel se o primeiro prazo da janela (24 h antes da eleicao)
