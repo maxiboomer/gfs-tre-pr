@@ -101,7 +101,7 @@ k = next(i for i, l in enumerate(html) if l.startswith("const D="))
 D = json.loads(html[k][8:].rstrip().rstrip(";"))
 reg = np.array(D["reg"]).reshape(17, 27)
 iso = run.strftime("%Y-%m-%dT%H:00Z")
-if any(r["run"] == iso for r in D["runs"]): sys.exit(f"ERRO: a rodada {iso} ja esta no artefato")
+if any(r["run"] == iso and r.get("model") == "ecmwf" for r in D["runs"]): sys.exit(f"ERRO: a rodada ECMWF {iso} ja esta no artefato")
 
 rhu = lambda x: float(np.floor(x + 0.5))
 frames, prob = [], []

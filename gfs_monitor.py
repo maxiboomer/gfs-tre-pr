@@ -36,12 +36,12 @@ def probe(cyc, f):
         return False
 
 
-def existe_no_artefato(cyc):
+def existe_no_artefato(cyc, model="gfs"):
     """Rotinas ja ingeridas, lidas direto do HTML publicado."""
     iso = datetime.strptime(cyc, "%Y%m%d%H").replace(tzinfo=timezone.utc).strftime("%Y-%m-%dT%H:00Z")
     with open(ART, encoding="utf-8") as fh:
         m = re.search(r'const D=(\{.*?\});\n', fh.read(), re.DOTALL)
-    return iso in [r["run"] for r in json.loads(m.group(1))["runs"]]
+    return iso in [r["run"] for r in json.loads(m.group(1))["runs"] if r.get("model") == model]
 
 
 def candidatas():
@@ -130,7 +130,7 @@ def main():
         f1 = int((ELEI + timedelta(hours=48) - t).total_seconds() // 3600)
         if f0 < 0 or f1 > 384:
             continue
-        if existe_no_artefato(cyc):
+        if existe_no_artefato(cyc, "ecmwf"):
             break  # ja ingerida; nao precisa de rodadas mais antigas
         if not probe_ecmwf(cyc, f0):
             continue
