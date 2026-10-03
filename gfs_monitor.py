@@ -126,9 +126,9 @@ def main():
     # ---- ECMWF primeiro (sai ~1h antes do GFS) ----
     for cyc in candidatas_ecmwf():
         t = datetime.strptime(cyc, "%Y%m%d%H").replace(tzinfo=timezone.utc)
-        f0 = int((ELEI - timedelta(hours=24) - t).total_seconds() // 3600)
+        f0 = max(0, int((ELEI - timedelta(hours=24) - t).total_seconds() // 3600))
         f1 = int((ELEI + timedelta(hours=48) - t).total_seconds() // 3600)
-        if f0 < 0 or f1 > 384:
+        if f1 > 384:
             continue
         if existe_no_artefato(cyc, "ecmwf"):
             break  # ja ingerida; nao precisa de rodadas mais antigas
