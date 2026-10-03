@@ -25,11 +25,13 @@ CYC, BASE, OUT = sys.argv[1], sys.argv[2], sys.argv[3]
 run = datetime.strptime(CYC, "%Y%m%d%H").replace(tzinfo=timezone.utc)
 ELEI = datetime(2026, 10, 4, 3, tzinfo=timezone.utc)       # 04/10 00h de Brasília
 W0, W1 = ELEI - timedelta(hours=24), ELEI + timedelta(hours=48)
-f0 = int((W0 - run).total_seconds() // 3600)
+f0 = max(0, int((W0 - run).total_seconds() // 3600))
 f1 = int((W1 - run).total_seconds() // 3600)
-assert f0 >= 0 and f0 % 3 == 0 and f1 <= 384, f"prazos inesperados: {f0}-{f1}"
+assert f0 % 3 == 0 and f1 <= 384, f"prazos inesperados: {f0}-{f1}"
 FH = list(range(f0, f1 + 1, 3))
-print(f"Rodada {CYC}: prazos f{f0:03d} a f{f1:03d} ({len(FH)} arquivos, {len(FH)-1} intervalos)")
+if FH[0] == 0:
+    FH = FH[1:]  # f000 nao tem tp_0-0 (instante inicial); comeca no f003
+print(f"Rodada {CYC}: prazos f{FH[0]:03d} a f{FH[-1]:03d} ({len(FH)} arquivos, {len(FH)-1} intervalos)")
 
 URL = ("https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl?"
        "dir=%2Fgfs.{d}%2F{h}%2Fatmos&file=gfs.t{h}z.pgrb2.0p25.f{f:03d}"
@@ -115,9 +117,10 @@ tot = G[FH[-1]][f"tp_0-{FH[-1]}"] - G[FH[0]][f"tp_0-{FH[0]}"]
 soma = sum(np.array(f["iv"]).reshape(17, 27) for f in frames)
 d = np.abs(tot - soma).max()
 if d > 0.05 * len(frames) + 0.1: prob.append(f"soma dos intervalos difere do total da janela em {d:.2f} mm")
-# consistência 3: intervalos contínuos de 3 h cobrindo -24 a 48
-if frames[0]["t0"] != -24 or frames[-1]["t1"] != 48 or any(f["t1"] - f["t0"] != 3 for f in frames):
-    prob.append("intervalos não cobrem 03/10 0h a 06/10 0h em passos de 3 h")
+# consistência 3: intervalos contínuos de 3 h (a rodada pode começar depois de -24
+# quando e mais recente que a janela; outras rodadas cobrem o inicio)
+if any(f["t1"] - f["t0"] != 3 for f in frames):
+    prob.append("intervalos não são contínuos de 3 h")
 
 print("\nChecagens:", "OK" if not prob else "")
 for p in prob: print("  PROBLEMA:", p)

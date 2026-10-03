@@ -152,9 +152,9 @@ def main():
         t = datetime.strptime(cyc, "%Y%m%d%H").replace(tzinfo=timezone.utc)
         # a rodada e usavel se o primeiro prazo da janela (24 h antes da eleicao)
         # existir e o ultimo (48 h depois) nao passar de f384
-        f0 = int((ELEI - timedelta(hours=24) - t).total_seconds() // 3600)
+        f0 = max(0, int((ELEI - timedelta(hours=24) - t).total_seconds() // 3600))
         f1 = int((ELEI + timedelta(hours=48) - t).total_seconds() // 3600)
-        if f0 < 0 or f1 > 384:
+        if f1 > 384:
             continue
         if existe_no_artefato(cyc):
             return 0  # ja ingerida; nada a fazer
