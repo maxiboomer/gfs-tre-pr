@@ -15,6 +15,8 @@ Saida: nada quando nao ha rodada nova (o cron nao notifica).
 """
 import sys, os, json, re, subprocess, urllib.request
 from datetime import datetime, timedelta, timezone
+sys.path.insert(0, "/root")
+from eleicao_config import config, janela, turno_ativo
 
 ART = "/root/artefato_final.html"
 PY = "/root/.hermes/venv-gfs/bin/python3"
@@ -23,8 +25,11 @@ BASE_URL = ("https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_0p25.pl?"
             "&var_APCP=on&var_PWAT=on&var_GUST=on&var_CAPE=on&all_lev=on&subregion="
             "&toplat=-22.5&bottomlat=-26.5&leftlon=305.5&rightlon=312")
 
-# janela do artefato: 03/10 00h BRT .. 06/10 00h BRT = 03/10 03Z .. 06/10 03Z
-ELEI = datetime(2026, 10, 4, 3, tzinfo=timezone.utc)
+# turno ativo (1t ou 2t) e sua config; ELEI e janela sao do turno ativo
+CFG = config(turno_ativo())
+ELEI = CFG["elei"]
+W0, W1 = janela(CFG["key"])
+TURNO_ARG = CFG["key"]
 
 
 def probe(cyc, f):
@@ -126,15 +131,15 @@ def main():
     # ---- ECMWF primeiro (sai ~1h antes do GFS) ----
     for cyc in candidatas_ecmwf():
         t = datetime.strptime(cyc, "%Y%m%d%H").replace(tzinfo=timezone.utc)
-        f0 = max(0, int((ELEI - timedelta(hours=24) - t).total_seconds() // 3600))
-        f1 = int((ELEI + timedelta(hours=48) - t).total_seconds() // 3600)
+        f0 = max(0, int((W0 - t).total_seconds() // 3600))
+        f1 = int((W1 - t).total_seconds() // 3600)
         if f1 > 384:
             continue
         if existe_no_artefato(cyc, "ecmwf"):
             break  # ja ingerida; nao precisa de rodadas mais antigas
         if not probe_ecmwf(cyc, f0):
             continue
-        cmd = [PY, "/root/atualizar_ecmwf.py", cyc, ART, ART]
+        cmd = [PY, "/root/atualizar_ecmwf.py", cyc, ART, ART, TURNO_ARG]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
         if r.returncode != 0:
             sys.stderr.write((r.stdout or "") + (r.stderr or ""))
@@ -152,8 +157,8 @@ def main():
         t = datetime.strptime(cyc, "%Y%m%d%H").replace(tzinfo=timezone.utc)
         # a rodada e usavel se o primeiro prazo da janela (24 h antes da eleicao)
         # existir e o ultimo (48 h depois) nao passar de f384
-        f0 = max(0, int((ELEI - timedelta(hours=24) - t).total_seconds() // 3600))
-        f1 = int((ELEI + timedelta(hours=48) - t).total_seconds() // 3600)
+        f0 = max(0, int((W0 - t).total_seconds() // 3600))
+        f1 = int((W1 - t).total_seconds() // 3600)
         if f1 > 384:
             continue
         if existe_no_artefato(cyc):
@@ -164,7 +169,7 @@ def main():
         if not probe(cyc, f0):
             continue
 
-        cmd = [PY, "/root/atualizar_gfs.py", cyc, ART, ART]
+        cmd = [PY, "/root/atualizar_gfs.py", cyc, ART, ART, TURNO_ARG]
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
         if r.returncode != 0:
             sys.stderr.write((r.stdout or "") + (r.stderr or ""))

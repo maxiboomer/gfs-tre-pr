@@ -17,9 +17,13 @@ import pygrib
 
 CYC, BASE, OUT = sys.argv[1], sys.argv[2], sys.argv[3]
 run = datetime.strptime(CYC, "%Y%m%d%H").replace(tzinfo=timezone.utc)
-ELEI = datetime(2026, 10, 4, 3, tzinfo=timezone.utc)
-W0, W1 = ELEI - timedelta(hours=24), ELEI + timedelta(hours=48)
-f0 = int((W0 - run).total_seconds() // 3600)
+TURNO = sys.argv[4] if len(sys.argv) > 4 else None   # '1t' | '2t' (default: ativo por data)
+sys.path.insert(0, "/root")
+from eleicao_config import config, janela
+CFG = config(TURNO)
+ELEI = CFG["elei"]
+W0, W1 = janela(CFG["key"])
+f0 = max(0, int((W0 - run).total_seconds() // 3600))
 f1 = int((W1 - run).total_seconds() // 3600)
 assert f0 >= 0 and f0 % 3 == 0 and f1 <= 384, f"prazos inesperados: {f0}-{f1}"
 FH = list(range(f0, f1 + 1, 3))
@@ -97,8 +101,8 @@ for f in FH:
 
 # ---- artefato base
 html = open(BASE, encoding="utf-8").read().split("\n")
-k = next(i for i, l in enumerate(html) if l.startswith("const D="))
-D = json.loads(html[k][8:].rstrip().rstrip(";"))
+k = next(i for i, l in enumerate(html) if l.startswith(f"const D{CFG['key'].upper()}="))
+D = json.loads(html[k][len(f"const D{CFG['key'].upper()}="):].rstrip().rstrip(";"))
 reg = np.array(D["reg"]).reshape(17, 27)
 iso = run.strftime("%Y-%m-%dT%H:00Z")
 if any(r["run"] == iso and r.get("model") == "ecmwf" for r in D["runs"]): sys.exit(f"ERRO: a rodada ECMWF {iso} ja esta no artefato")
@@ -140,7 +144,7 @@ D["runs"].append({"label": run.strftime("%d/%m · %H UTC"), "run": iso, "model":
 D["runs"].sort(key=lambda r: r["run"])
 for i, r in enumerate(D["runs"]):
     r["section"] = "current" if i >= len(D["runs"]) - 2 else "archive"
-html[k] = "const D=" + json.dumps(D, ensure_ascii=False, separators=(",", ":")) + ";"
+html[k] = f"const D{CFG['key'].upper()}=" + json.dumps(D, ensure_ascii=False, separators=(",", ":")) + ";"
 open(OUT, "w", encoding="utf-8").write("\n".join(html))
 
 print(f"\nGerado {OUT} com {len(D['runs'])} rodadas ({os.path.getsize(OUT)/1e6:.1f} MB)")
