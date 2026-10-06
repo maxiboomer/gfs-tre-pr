@@ -1,6 +1,6 @@
 # GFS TRE-PR — Risco Climático Eleição 2026
 
-Monitoramento do modelo GFS 0,25° para previsão de risco climático no Paraná durante a eleição de 4 de outubro de 2026.
+Monitoramento dos modelos GFS 0,25° e ECMWF IFS 0,25° para previsão de risco climático no Paraná durante as eleições de 2026 (**1º turno 04/10, 2º turno 25/10**).
 
 ## O que faz
 
@@ -14,9 +14,22 @@ Monitoramento do modelo GFS 0,25° para previsão de risco climático no Paraná
 
 | Arquivo | Descrição |
 |---|---|
-| `atualizar_gfs.py` | Script principal — baixa GRIB, processa, atualiza artefato |
+| `atualizar_gfs.py` | Script principal — baixa GRIB, processa, atualiza artefato (turno via 4º arg) |
+| `atualizar_ecmwf.py` | Baixa ECMWF IFS 0,25° (HTTP Range), processa, atualiza artefato |
 | `gfs_monitor.py` | Monitor para cron — verifica disponibilidade, roda atualização |
+| `eleicao_config.py` | Config dos turnos: ELEI, janela, turno ativo por data (override `ELEI_TURNO`) |
 | `monitor_gfs.py` | Monitor antigo (loop 30min) — substituído por cron do Hermes |
+
+## Turnos
+
+O artefato tem **dois painéis** (1º e 2º turno), alternados por `?turno=1t|2t` na URL. Cada turno tem data de referência e janela próprias:
+
+| Turno | Eleição | Janela |
+|---|---|---|
+| 1t | 04/10 | -24h..+48h (véspera + eleição + dia seguinte) |
+| 2t | 25/10 | -48h..+24h (2 dias antes + 1 dia depois) |
+
+O turno ativo é detectado por data: **1t até 21/10, 2t a partir de 22/10** (3 dias antes, para acumular rodadas de comparação). Override com `ELEI_TURNO=1t|2t`.
 
 ## Uso
 
@@ -24,8 +37,9 @@ Monitoramento do modelo GFS 0,25° para previsão de risco climático no Paraná
 # Deixar o monitor descobrir a rodada sozinho (é o que o cron faz)
 /root/.hermes/venv-gfs/bin/python3 gfs_monitor.py
 
-# Ou forçar uma rodada específica (ciclo AAAAMMDDHH)
-python3 atualizar_gfs.py 2026093012 artefato_final.html artefato_final.html
+# Ou forçar uma rodada específica (ciclo AAAAMMDDHH, turno opcional)
+python3 atualizar_gfs.py 2026093012 artefato_final.html artefato_final.html 1t
+python3 atualizar_ecmwf.py 2026100212 artefato_final.html artefato_final.html 2t
 ```
 
 O monitor descobre sozinho a rodada **12Z** mais recente que ainda não está no
