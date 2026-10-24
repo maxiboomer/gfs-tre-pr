@@ -41,12 +41,34 @@ def probe(cyc, f):
         return False
 
 
+def _runs_turno():
+    """runs do bloco do turno ativo, lidos do HTML publicado.
+
+    O HTML tem DOIS datasets (D1T e D2T); o bloco certo e o do turno ativo.
+    Nao da para usar regex em 'const D=' — esse prefixo so existe no seletor
+    'const D=new URLSearchParams(...)', que nao tem JSON nenhum.
+    """
+    key = CFG["key"].upper()
+    html = open(ART, encoding="utf-8").read()
+    k = html.find(f"const D{key}=")
+    if k < 0:
+        return []
+    j = html.find("{", k)
+    depth = 0
+    for p in range(j, len(html)):
+        if html[p] == "{":
+            depth += 1
+        elif html[p] == "}":
+            depth -= 1
+            if depth == 0:
+                return json.loads(html[j:p + 1])["runs"]
+    return []
+
+
 def existe_no_artefato(cyc, model="gfs"):
-    """Rotinas ja ingeridas, lidas direto do HTML publicado."""
+    """Rotinas ja ingeridas, lidas direto do bloco do turno ativo no HTML."""
     iso = datetime.strptime(cyc, "%Y%m%d%H").replace(tzinfo=timezone.utc).strftime("%Y-%m-%dT%H:00Z")
-    with open(ART, encoding="utf-8") as fh:
-        m = re.search(r'const D=(\{.*?\});\n', fh.read(), re.DOTALL)
-    return iso in [r["run"] for r in json.loads(m.group(1))["runs"] if r.get("model") == model]
+    return iso in [r["run"] for r in _runs_turno() if r.get("model") == model]
 
 
 def candidatas():
@@ -111,11 +133,11 @@ def publicar():
     gh = subprocess.run(
         ["bash", "-lc",
          "cd /root/gfs-tre-pr && "
-         "gh release delete v1.0 --yes >/dev/null 2>&1; "
-         "gh release create v1.0 --title 'Rodada GFS atualizada' "
-         "--notes 'Atualizacao automatica pelo monitor GFS.' "
+         "gh release delete v2.0 --yes >/dev/null 2>&1; "
+         "gh release create v2.0 --title 'Artefato 2 turnos - rodada atualizada' "
+         " --notes 'Atualizacao automatica pelo monitor GFS (1T + 2T no mesmo HTML).' "
          "--repo maxiboomer/gfs-tre-pr >/dev/null 2>&1 && "
-         "gh release upload v1.0 " + ART + " --repo maxiboomer/gfs-tre-pr >/dev/null 2>&1"],
+         "gh release upload v2.0 " + ART + " --repo maxiboomer/gfs-tre-pr >/dev/null 2>&1"],
         capture_output=True, text=True, timeout=180)
     if gh.returncode != 0:
         sys.stderr.write("release GitHub falhou: " + (gh.stderr or "")[:300] + "\n")

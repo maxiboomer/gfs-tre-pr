@@ -27,7 +27,9 @@ f0 = max(0, int((W0 - run).total_seconds() // 3600))
 f1 = int((W1 - run).total_seconds() // 3600)
 assert f0 >= 0 and f0 % 3 == 0 and f1 <= 384, f"prazos inesperados: {f0}-{f1}"
 FH = list(range(f0, f1 + 1, 3))
-print(f"Rodada ECMWF {CYC}: prazos f{f0:03d} a f{f1:03d} ({len(FH)} arquivos)")
+if FH[0] == 0:
+    FH = FH[1:]  # f000 e o instante inicial; comeca no f003 (alinhado ao GFS)
+print(f"Rodada ECMWF {CYC}: prazos f{FH[0]:03d} a f{FH[-1]:03d} ({len(FH)} arquivos)")
 
 ROOT = f"https://data.ecmwf.int/forecasts/{CYC[:8]}/{CYC[8:]}z/ifs/0p25/oper/"
 BASE_URL = f"{ROOT}{CYC[:8]}{CYC[8:]}0000"
@@ -131,9 +133,10 @@ for a, b in zip(FH[:-1], FH[1:]):
                    "pw": [round(float(x), 1) for x in B["pw"].ravel()],
                    "st": st, "rainAll": round(float(iv[reg > 0].max()) / norm, 1)})
 
-# consistencia: intervalos continuos de 3 h cobrindo -24 a 48
-if frames[0]["t0"] != -24 or frames[-1]["t1"] != 48 or any(f["t1"] - f["t0"] != 3 for f in frames):
-    prob.append("intervalos nao cobrem 03/10 0h a 06/10 0h em passos de 3 h")
+# consistencia: intervalos continuos de 3 h terminando no fim da janela do turno
+W1H = int((W1 - ELEI).total_seconds() // 3600)
+if frames[-1]["t1"] != W1H or any(f["t1"] - f["t0"] != 3 for f in frames):
+    prob.append(f"intervalos nao cobrem a janela do turno em passos de 3 h (esperado fim em {W1H}h)")
 
 print("\nChecagens:", "OK" if not prob else "")
 for p in prob: print("  PROBLEMA:", p)
